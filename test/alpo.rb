@@ -109,6 +109,14 @@ Testing Alpo do
     ]
     assert{ expected == pairs.sort }
   end
+  testing 'converting data with numeric keys into a list' do
+    data = Alpo.data(:list)
+    data.set(
+      0 => 40,
+      1 => 2
+    )
+    assert{ data.to_array == [40,2] }
+  end
 
 
 # parser

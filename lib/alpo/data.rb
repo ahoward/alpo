@@ -15,7 +15,7 @@ module Alpo
     def initialize(*args)
       options = HashWithIndifferentAccess.new(args.last.is_a?(Hash) ? args.pop : {})
 
-      name = args.shift || :data
+      name = args.shift
       id = args.shift
 
       name = name.to_s if name
@@ -69,36 +69,44 @@ module Alpo
 
     def set(*args)
       if args.size == 1 and args.first.is_a?(Hash)
-        options = args.pop
-        keys, value = options.to_a.first
+        options = args.shift
       else
+        options = {}
         value = args.pop
         keys = args
+        options[keys] = value
       end
-      keys = Array(keys).flatten
 
-      collection = self
-      return collection[keys.first] = value if keys.size <= 1
+      options.each do |keys, value|
+        keys = Array(keys).flatten
 
-      key = nil
-
-      keys.each_cons(2) do |a, b|
-        a, b = key_for(a), key_for(b)
-        case b
-          when Numeric
-            collection[a] ||= []
-            raise(IndexError, "(#{ collection.inspect })[#{ a.inspect }]=#{ value.inspect }") unless collection[a].is_a?(Array)
-
-          when String, Symbol
-            collection[a] ||= {}
-            raise(IndexError, "(#{ collection.inspect })[#{ a.inspect }]=#{ value.inspect }") unless collection[a].is_a?(Hash)
+        collection = self
+        if keys.size <= 1
+          collection[keys.first] = value
+          next
         end
-        collection = collection[a]
-        key = b
+
+        key = nil
+
+        keys.each_cons(2) do |a, b|
+          a, b = key_for(a), key_for(b)
+          case b
+            when Numeric
+              collection[a] ||= []
+              raise(IndexError, "(#{ collection.inspect })[#{ a.inspect }]=#{ value.inspect }") unless collection[a].is_a?(Array)
+
+            when String, Symbol
+              collection[a] ||= {}
+              raise(IndexError, "(#{ collection.inspect })[#{ a.inspect }]=#{ value.inspect }") unless collection[a].is_a?(Hash)
+          end
+          collection = collection[a]
+          key = b
+        end
+
+        collection[key] = value
       end
 
-      collection[key] = value
-      return value
+      return options.values
     end
 
     def Data.key_for(key)
@@ -129,6 +137,18 @@ module Alpo
       dup.delete('_name') unless other.has_key?('_name')
       dup.delete('_id') unless other.has_key?('_id')
       dup == with_indifferent_access(other)
+    end
+
+    def to_array
+      array = []
+      each_pair do |key, val|
+        array[key.to_i] = val if(key.is_a?(Numeric) or key.to_s =~ %r/^\d+$/)
+      end
+      array
+    end
+
+    def to_list
+      to_array
     end
 
     def form
