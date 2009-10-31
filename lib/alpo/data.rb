@@ -121,6 +121,10 @@ module Alpo
       end
     end
 
+    def depth_first_each(*args, &block)
+      Alpo.depth_first_each(enumerable=self, *args, &block)
+    end
+
     def =~(other)
       dup = self.dup
       dup.delete('_name') unless other.has_key?('_name')

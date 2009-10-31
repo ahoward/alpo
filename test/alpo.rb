@@ -87,6 +87,28 @@ Testing Alpo do
     assert{ data =~ {:a => {:b => [40,2]}} }
     assert{ data.get(:a,:b) == [40,2] }
   end
+  testing 'depth first traversal' do
+    data = assert{ Alpo.data.new }
+    assert{ data.set(:A => 42) }
+    assert{ data.set(:Z => 42.0) }
+    assert{ data.set([:a,:b,0] => 40) }
+    assert{ data.set([:a,:b,1] => 2) }
+
+    pairs = []
+    assert{
+      data.depth_first_each do |keys, val|
+        pairs.push([keys, val])
+      end
+      true
+    }
+    expected = [
+      [["A"], 42],
+      [["Z"], 42.0],
+      [["a", "b", 0], 40],
+      [["a", "b", 1], 2]
+    ]
+    assert{ expected == pairs.sort }
+  end
 
 
 # parser
