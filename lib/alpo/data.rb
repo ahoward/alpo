@@ -1,6 +1,5 @@
 module Alpo
   class Data < HashWithIndifferentAccess
-
     def Data.for(object)
       case @object
         when String, Symbol
@@ -16,7 +15,7 @@ module Alpo
     def initialize(*args)
       options = HashWithIndifferentAccess.new(args.last.is_a?(Hash) ? args.pop : {})
 
-      name = args.shift
+      name = args.shift || :data
       id = args.shift
 
       name = name.to_s if name
@@ -136,79 +135,18 @@ module Alpo
       @form ||= Form.new(self)
     end
 
-    class Form
-      include Tagz.globally
+    def errors
+      @errors ||= Errors.new(self)
+    end
 
-      attr 'data'
+    alias_method 'error', 'errors'
 
-      def initialize(data)
-        @data = data
-      end
-
-      def input(*args)
-        options = Alpo.hash_for(args.last.is_a?(Hash) ? args.pop : {})
-        keys = args.flatten
-
-        type = options.delete(:type) || :text
-        name = options.delete(:name) || name_for(keys)
-        value = options.delete(:value) || data.get(keys)
-        id = options.delete(:id) || id_for(keys)
-        klass = options.delete(:class) || class_for(keys)
-
-        input_(options.merge(:type => type, :name => name, :value => value, :class => klass, :id => id)){}
-      end
-
-      def button(*args)
-        options = Alpo.hash_for(args.last.is_a?(Hash) ? args.pop : {})
-        keys = args.flatten
-
-        type = options.delete(:type) || :button
-        name = options.delete(:name) || name_for(keys)
-        value = options.delete(:value) || data.get(keys)
-        id = options.delete(:id) || id_for(keys)
-        klass = options.delete(:class) || class_for(keys)
-
-        button_(options.merge(:type => type, :name => name, :value => value, :class => klass, :id => id)){}
-      end
-
-      def textarea(*args)
-        options = Alpo.hash_for(args.last.is_a?(Hash) ? args.pop : {})
-        keys = args.flatten
-
-        value = options.delete(:value) || data.get(keys)
-        name = options.delete(:name) || name_for(keys)
-        id = options.delete(:id) || id_for(keys)
-        klass = options.delete(:class) || class_for(keys)
-
-        textarea_(options.merge(:name => name, :class => klass, :id => id)){ value }
-      end
-
-# TODO
-      def select(*args)
-      end
-
-      def id_for(keys)
-        if((prefix = data._prefix))
-          Slug.for("#{ prefix }_#{ keys.join('-') }")
-        else
-          Slug.for(*keys)
-        end
-      end
-
-      def class_for(keys)
-        if((name = data._name))
-          "#{ name }"
-        end
-      end
-
-      def name_for(keys)
-        prefix = data._prefix
-        "#{ prefix }(#{ keys.flatten.join(',') })"
-      end
+    def new(*args, &block)
+      self.class.new(*args, &block)
     end
   end
 
   def data(*args, &block)
-    Alpo::Data
+    Alpo::Data.new(*args, &block)
   end
 end

@@ -1,5 +1,13 @@
 module Alpo
   class Errors < ::Alpo::Data
+    include Tagz.globally
+
+    attr 'data'
+
+    def initialize(data = Alpo.data)
+      @data = data
+    end
+
     def add(*args)
       options = Alpo.hash_for(args.last.is_a?(Hash) ? args.pop : {})
 
@@ -25,6 +33,8 @@ module Alpo
     def invalid?(*keys)
       !get(keys).nil?
     end
+
+    alias_method 'on?', 'invalid?'
 
     alias_method 'on', 'get'
 
@@ -58,6 +68,46 @@ module Alpo
 
     def each_full
       full_messages.each{|msg| yield msg}
+    end
+
+    def messages
+      messages =
+        (self['*']||[]).map{|message| message.to_s}.
+        select{|message| not message.strip.empty?}
+    end
+
+    def each_message
+      messages.each{|msg| yield msg}
+    end
+
+    def to_html(*args, &block)
+      at_least_one = false
+      klass = [data._name, 'errors'].compact.join(' ')
+
+      html =
+        table_(:class => klass){
+          thead_{
+            tr_{
+              th_{ 'name' }
+              th_{ 'message' }
+            }
+          }
+          tbody_{
+            full_messages.each do |key, value|
+              at_least_one = true
+              tr_{
+                td_{ key }
+                td_{ value }
+              }
+            end
+          }
+        }
+
+      at_least_one ? html : ''
+    end
+
+    def to_s(*args, &block)
+      to_html(*args, &block)
     end
   end
 end

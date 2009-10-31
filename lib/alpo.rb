@@ -44,6 +44,7 @@
     load 'exceptions.rb'
     load 'hash_with_indifferent_access.rb'
     load 'data.rb'
+    load 'data/form.rb'
     load 'errors.rb'
     load 'slug.rb'
     load 'support.rb'
