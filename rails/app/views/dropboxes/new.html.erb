@@ -1,0 +1,23 @@
+<h1>New dropbox</h1>
+
+<% form_for(@dropbox) do |f| %>
+  <%= f.error_messages %>
+
+  <p>
+    <%= f.label :name %><br />
+    <%= f.text_field :name %>
+  </p>
+  <p>
+    <%= f.label :real_user %><br />
+    <%= f.text_field :real_user %>
+  </p>
+  <p>
+    <%= f.label :effective_user %><br />
+    <%= f.text_field :effective_user %>
+  </p>
+  <p>
+    <%= f.submit 'Create' %>
+  </p>
+<% end %>
+
+<%= link_to 'Back', dropboxes_path %>
