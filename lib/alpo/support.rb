@@ -1,4 +1,6 @@
 module Alpo
+# TODO - factor this out into 'util' or some such
+#
   def normalized_hash(hash = {})
     HashWithIndifferentAccess.new.update(hash)
   end
@@ -32,5 +34,18 @@ module Alpo
       else
         enumerable.each_pair(*args, &block)
     end
+  end
+
+  def key_for(key)
+    return key if Numeric===key
+    key.to_s =~ %r/^\d+$/ ? Integer(key) : key
+  end
+
+  def underscore(camel_cased_word)
+    camel_cased_word.to_s.gsub(/::/, '/').
+      gsub(/([A-Z]+)([A-Z][a-z])/,'\1_\2').
+      gsub(/([a-z\d])([A-Z])/,'\1_\2').
+      tr("-", "_").
+      downcase
   end
 end

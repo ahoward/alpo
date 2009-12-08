@@ -112,10 +112,14 @@ module Alpo
       Hash.new(default).merge(self)
     end
 
+    def =~(other)
+      self == with_indifferent_access(other)
+    end
+
     protected
-      def with_indifferent_access(hash = {})
-        # HashWithIndifferentAccess.new.update(hash)
-        self.class.new.update(hash)
+      def with_indifferent_access(other = {})
+        return other if other.is_a?(HashWithIndifferentAccess)
+        coerced = HashWithIndifferentAccess.new.update(other)
       end
 
       def convert_key(key)

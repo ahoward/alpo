@@ -1,7 +1,0 @@
-# Read about fixtures at http://ar.rubyonrails.org/classes/Fixtures.html
-
-admin:
-  email: admin@domain.com 
-
-user_a:
-  email: user_a@domain.com 

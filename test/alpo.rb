@@ -7,47 +7,14 @@ Testing Alpo do
   testing 'basic data can be constructed' do
     data = assert{ Alpo.data.new }
   end
-  testing 'basic data can be constructed with a name' do
-    data = assert{ Alpo.data.new('name') }
-    assert{ data._name == 'name' }
-  end
-  testing 'basic data can be constructed with a name and id' do
-    data = assert{ Alpo.data.new('name', 42) }
-    assert{ data._name == 'name' }
-    assert{ data._id == 42 }
-  end
-  testing 'basic data can be constructed with a name-id' do
-    data = assert{ Alpo.data.new('name-42') }
-    assert{ data._name == 'name' }
-    assert{ data._id == 42 }
-  end
-  testing 'basic data can be constructed with a name-new' do
-    data = assert{ Alpo.data.new('name-new') }
-    assert{ data._name == 'name' }
-    assert{ data._id == 'new' }
+  testing 'basic data can be constructed with a key' do
+    data = assert{ Alpo.data.new('key') }
+    assert{ data.key == 'key' }
   end
   testing 'data can be constructed with values' do
     data = assert{ Alpo.data.new(:key => :value) }
-    assert{ data._name == nil }
-    assert{ data._id == nil }
-    assert{ data =~ {:key => :value} }
-  end
-  testing 'data can be constructed with name and id and values' do
-    data = assert{ Alpo.data.new('name', 42, :key => :value) }
-    assert{ data._name == 'name' }
-    assert{ data._id == 42 }
-    assert{ data =~ {:key => :value} }
-  end
-  testing 'data can be constructed with name-id and values' do
-    data = assert{ Alpo.data.new('name-42', :key => :value) }
-    assert{ data._name == 'name' }
-    assert{ data._id == 42 }
-    assert{ data =~ {:key => :value} }
-  end
-  testing 'data can be constructed with name-new and values' do
-    data = assert{ Alpo.data.new('name-new', :key => :value) }
-    assert{ data._name == 'name' }
-    assert{ data._id == 'new' }
+    #assert{ data.key == nil }
+    #assert{ data._id == nil }
     assert{ data =~ {:key => :value} }
   end
   testing 'indifferent access' do
@@ -111,75 +78,44 @@ Testing Alpo do
   end
   testing 'converting data with numeric keys into a list' do
     data = Alpo.data(:list)
-    data.set(
-      0 => 40,
-      1 => 2
-    )
+    assert{
+      data.set(
+        0 => 40,
+        1 => 2
+      )
+    }
     assert{ data.to_array == [40,2] }
   end
 
 
 # parser
 #
-  testing 'parsing a simple hash by name' do
+  testing 'parsing a simple hash by key' do
     params = {
-      'name(a)' => 40,
-      'name(b)' => 2
+      'key(a)' => 40,
+      'key(b)' => 2
     }
-    parsed = Alpo.parse(:name, params)
+    parsed = Alpo.parse(:key, params)
     expected = {'a' => 40, 'b' => 2}
     assert{ parsed =~ expected }
   end
-  testing 'parsing a simple hash by name-id' do
+  testing 'parsing a nested hash by key' do
     params = {
-      'name-42(a)' => 40,
-      'name-42(b)' => 2
+      'key(a,x)' => 40,
+      'key(a,y)' => 2
     }
-    parsed = Alpo.parse(:name, params)
-    expected = {'a' => 40, 'b' => 2}
-    assert{ parsed =~ expected }
-    assert{ parsed['_id'] == 42 }
-    assert{ parsed._id == 42 }
-  end
-  testing 'parsing a simple hash by name-new' do
-    params = {
-      'name-new(a)' => 40,
-      'name-new(b)' => 2
-    }
-    parsed = Alpo.parse(:name, params)
-    expected = {'a' => 40, 'b' => 2}
-    assert{ parsed =~ expected }
-    assert{ parsed['_id'] == 'new' }
-    assert{ parsed._id == 'new' }
-  end
-  testing 'parsing a nested hash by name' do
-    params = {
-      'name(a,x)' => 40,
-      'name(a,y)' => 2
-    }
-    parsed = Alpo.parse(:name, params)
+    parsed = Alpo.parse(:key, params)
     expected = {'a' => {'x' => 40, 'y' => 2}} 
     assert{ parsed =~ expected }
   end
-  testing 'parsing a deeply nested hash by name' do
+  testing 'parsing a deeply nested hash by key' do
     params = {
-      'name(a,b,x)' => 40,
-      'name(a,b,y)' => 2
+      'key(a,b,x)' => 40,
+      'key(a,b,y)' => 2
     }
-    parsed = Alpo.parse(:name, params)
+    parsed = Alpo.parse(:key, params)
     expected = {'a' => {'b' => {'x' => 40, 'y' => 2}}} 
     assert{ parsed =~ expected }
-  end
-  testing 'parsing a deeply nested hash by name-id' do
-    params = {
-      'name-42(a,b,x)' => 40,
-      'name-42(a,b,y)' => 2
-    }
-    parsed = Alpo.parse(:name, params)
-    expected = {'a' => {'b' => {'x' => 40, 'y' => 2}}} 
-    assert{ parsed =~ expected }
-    assert{ parsed['_id'] == 42 }
-    assert{ parsed._id == 42 }
   end
 
 end

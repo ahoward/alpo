@@ -1,5 +1,6 @@
 module Alpo
-  class Errors < ::Alpo::Data
+  class Errors < HashWithIndifferentAccess
+    include HashMethods
     include Tagz.globally
 
     attr 'data'
@@ -16,7 +17,15 @@ module Alpo
       keys = args
       keys = %w( * ) if keys.empty?
 
-      options[keys] = message if message
+      if message
+        if message.respond_to?(:full_messages)
+          message.each do |key, msg|
+            options[key] = msg.to_s
+          end
+        else
+          options[keys] = message.to_s
+        end
+      end
 
       options.each do |keys, message|
         list = get(keys)
@@ -82,28 +91,31 @@ module Alpo
 
     def to_html(*args, &block)
       at_least_one = false
-      klass = [data._name, 'errors'].compact.join(' ')
+      klass = [data._name, 'alpo errors'].compact.join(' ')
 
       html =
         table_(:class => klass){
-          thead_{
-            tr_{
-              th_{ 'name' }
-              th_{ 'message' }
-            }
-          }
+          caption_(:style => 'white-space:nowrap'){ 'Sorry, there were some errors' }
+
           tbody_{
             full_messages.each do |key, value|
               at_least_one = true
+              key = key.to_s
+              key = key.respond_to?(:humanize) ? key.humanize: key.capitalize
               tr_{
-                td_{ key }
-                td_{ value }
+                td_(:class => 'key'){ key }
+                td_(:class => 'separator'){ '&nbsp;:&nbsp;' }
+                td_(:class => 'value'){ value }
               }
             end
           }
         }
 
       at_least_one ? html : ''
+    end
+
+    def Errors.to_html(&block)
+      define_method(:to_html, &block)
     end
 
     def to_s(*args, &block)

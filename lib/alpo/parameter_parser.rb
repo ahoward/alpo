@@ -1,25 +1,28 @@
 module Alpo
   module ParameterParser
-    def parse_params(name, hash = {})
-      data = Alpo::Data.new(name)
+    def parse_params(key = 'data', hash = {}, &block)
+      key = key.to_s
+      data = Alpo::Data.new(key)
+      hash = HashWithIndifferentAccess.new.update(hash)
+      base = hash[key]
+      data.update(base) if base
 
-      name = data._name
-      re = %r/^ #{ Regexp.escape(name) } (?:-([^(]+))? (?: [(] ([^)]+) [)] )? $/x
+      key = data.key
+      re = %r/^ #{ Regexp.escape(key) } (?: [(] ([^)]+) [)] )? $/x
+      missing = true
 
       hash.each do |key, value|
         next unless(key.is_a?(String) or key.is_a?(Symbol))
         key = key.to_s
-        match, id, keys = re.match(key).to_a
+        match, keys = re.match(key).to_a
         next unless match
         next unless keys
-        if id
-          id = Data.key_for(id)
-          data._id ||= id
-        end
-        next unless data._id == id
         keys = keys.strip.split(%r/\s*,\s*/).map{|key| key =~ %r/^\d+$/ ? Integer(key) : key}
         data.set(keys => value)
+        missing = false
       end
+
+      block.call(data) if(block and missing)
 
       data
     end

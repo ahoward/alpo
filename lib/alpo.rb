@@ -1,6 +1,7 @@
 # built-in libs
 #
   require 'enumerator'
+  require 'pathname'
 
 # rubygem libs
 #
@@ -17,14 +18,14 @@
 # alpo libs
 #
   module Alpo
-    Version = '0.0.1' unless defined?(Version)
+    Version = '0.4.2' unless defined?(Version)
 
     def version
       Alpo::Version
     end
 
     def libdir(*args, &block)
-      @libdir ||= File.expand_path(__FILE__).sub(/\.rb$/,'')
+      @libdir ||= Pathname.new(__FILE__).realpath.to_s.sub(/\.rb$/,'')
       args.empty? ? @libdir : File.join(@libdir, *args)
     ensure
       if block
@@ -43,10 +44,13 @@
   Alpo.libdir do
     load 'exceptions.rb'
     load 'hash_with_indifferent_access.rb'
+    load 'hash_methods.rb'
     load 'data.rb'
     load 'data/form.rb'
     load 'errors.rb'
     load 'slug.rb'
     load 'support.rb'
+    load 'status.rb'
     load 'parameter_parser.rb'
+    load 'api.rb'
   end
