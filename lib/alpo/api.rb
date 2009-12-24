@@ -1,35 +1,71 @@
 module Alpo
   class Api
-    attr_accessor :mode
-    attr_accessor :namespace
 
+  # mode support
+  #
     def Api.new(*args, &block)
       api = allocate
       api.instance_eval do
-        @mode = :read
+        @mode = Mode.for(:read)
         @catching = false
         initialize(*args, &block)
       end
       api
     end
 
-    def mode= mode
-      @mode = mode.to_s.strip.downcase.to_sym
+    class Mode < ::String
+      class << Mode
+        def for(mode)
+          mode.is_a?(Mode) ? mode : Mode.new(mode.to_s)
+        end
+      end
+
+      Write = Mode.for(:write) unless defined?(Write)
+      Read = Mode.for(:read) unless defined?(Read)
+      Post = Write unless defined?(Post)
+      Get = Read unless defined?(Get)
+      Default = Read unless defined?(Default)
+
+      class << Mode
+        %w( read write get post default ).each do |method|
+          define_method(method){ const_get(method.capitalize) }
+        end
+      end
+
+      def ==(other)
+        super(Mode.for(other))
+      end
     end
 
-    def read(&block)
-      mode = self.mode
-      self.mode = :read
-      if block
-        begin; block.call(self); ensure; self.mode = mode; end
+
+    def mode=(mode)
+      @mode = Mode.for(mode)
+    end
+
+    def mode(*args, &block)
+      @mode ||= Mode.default
+
+      if args.empty? and block.nil?
+        @mode
       else
+        if block
+          mode = self.mode
+          self.mode = args.shift
+          begin
+            instance_eval(&block)
+          ensure
+            self.mode = mode
+          end
+        else
+          self.mode = args.shift
+        end
         self
       end
     end
-    alias_method 'get', 'read'
 
-    def read?(&block)
-      condition = @mode == :read
+    def mode?(mode, &block)
+      condition = self.mode == mode
+
       if block.nil?
         condition
       else
@@ -40,32 +76,36 @@ module Alpo
         end
       end
     end
+
+    def Api.modes(*modes)
+      @modes ||= []
+      modes.flatten.compact.map{|mode| Api.add_mode(mode)} unless modes.empty?
+      @modes
+    end
+
+    def Api.add_mode(mode)
+      modes.push(mode = Mode.for(mode)).uniq!
+
+      module_eval <<-__
+        def #{ mode }(&block)
+          mode(#{ mode.inspect }, &block)
+        end
+        def #{ mode }?(&block)
+          mode?(#{ mode.inspect }, &block)
+        end
+      __
+
+      mode
+    end
+
+    Api.modes('read', 'write')
+
+    alias_method 'get', 'read'
     alias_method 'get?', 'read?'
 
-    def write(&block)
-      mode = self.mode
-      self.mode = :write
-      if block
-        begin; block.call(self); ensure; self.mode = mode; end
-      else
-        self
-      end
-    end
     alias_method 'post', 'write'
-
-    def write?(&block)
-      condition = @mode == :write
-      if block.nil?
-        condition
-      else
-        if condition
-          result = block.call
-          throw(:result, result) if catching?
-          result
-        end
-      end
-    end
     alias_method 'post?', 'write?'
+
 
     def catching(label = :result, &block)
       catching = @catching
@@ -78,6 +118,10 @@ module Alpo
     def catching?
       @catching
     end
+
+  # namespace support
+  #
+    attr_accessor :namespace
 
     class Namespace < Module
       def method_added(method)
@@ -113,7 +157,7 @@ module Alpo
 
     class << Api
       def Namespace(name, &block)
-        name = name.to_s.downcase.strip.to_sym 
+        name = name.to_s.downcase.strip
 
         namespace = namespaces[name]
 
@@ -122,12 +166,20 @@ module Alpo
             namespace.module_eval(&block)
           else
             namespace = namespaces[name] = Namespace.new(name, &block)
-            define_method(name) do
-              namespaced = self.dup
-              namespaced.extend(namespace)
-              namespaced.namespace = namespace
-              namespaced
-            end
+
+            module_eval <<-__
+              def #{ name }(&block)
+                namespaced = self.dup
+                namespace = self.class.namespaces[#{ name.inspect }]
+                namespaced.extend(namespace)
+                namespaced.namespace = namespace
+                if block
+                  namespaced.instance_eval(&block)
+                else
+                  namespaced
+                end
+              end
+            __
           end
         end
 
