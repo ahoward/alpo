@@ -12,7 +12,7 @@ end
 task :test do
   testdir = File.join(This.dir, 'test')
   Dir.chdir(testdir) do
-    exec "rake test"
+    exec 'ruby -I ../lib -r alpo ./alpo.rb'
   end
 end
 
