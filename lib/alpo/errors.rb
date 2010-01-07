@@ -2,6 +2,7 @@ module Alpo
   class Errors < HashWithIndifferentAccess
     include HashMethods
     include Tagz.globally
+    extend Tagz.globally
 
     attr 'data'
 
@@ -90,32 +91,46 @@ module Alpo
     end
 
     def to_html(*args, &block)
+      Errors.to_html(errors=self, *args, &block)
+    end
+
+    def Errors.to_html(*args, &block)
+      if block
+        define_method(:to_html, &block)
+      else
+        errors_to_html(*args, &block)
+      end
+    end
+
+    def Errors.errors_to_html(*args)
+      options = Alpo.hash_for(args.last.is_a?(Hash) ? args.pop : {})
+      errors = args.flatten.compact
+
       at_least_one = false
-      klass = [data._name, 'alpo errors'].compact.join(' ')
+      names = errors.map{|e| e.data._name}
+      klass = [names, 'alpo errors'].flatten.compact.join(' ')
 
       html =
         table_(:class => klass){
           caption_(:style => 'white-space:nowrap'){ 'Sorry, there were some errors' }
 
           tbody_{
-            full_messages.each do |key, value|
-              at_least_one = true
-              key = key.to_s
-              key = key.respond_to?(:humanize) ? key.humanize: key.capitalize
-              tr_{
-                td_(:class => 'key'){ key }
-                td_(:class => 'separator'){ '&nbsp;:&nbsp;' }
-                td_(:class => 'value'){ value }
-              }
+            errors.each do |e|
+              e.full_messages.each do |key, value|
+                at_least_one = true
+                key = key.to_s
+                key = key.respond_to?(:humanize) ? key.humanize: key.capitalize
+                tr_{
+                  td_(:class => 'key'){ key }
+                  td_(:class => 'separator'){ '&nbsp;:&nbsp;' }
+                  td_(:class => 'value'){ value }
+                }
+              end
             end
           }
         }
 
       at_least_one ? html : ''
-    end
-
-    def Errors.to_html(&block)
-      define_method(:to_html, &block)
     end
 
     def to_s(*args, &block)
