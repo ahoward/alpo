@@ -43,14 +43,14 @@
 
   Alpo.libdir do
     load 'exceptions.rb'
+    load 'support.rb'
+    load 'status.rb'
     load 'hash_with_indifferent_access.rb'
     load 'hash_methods.rb'
     load 'data.rb'
     load 'data/form.rb'
     load 'errors.rb'
     load 'slug.rb'
-    load 'support.rb'
-    load 'status.rb'
     load 'parameter_parser.rb'
     load 'api.rb'
   end

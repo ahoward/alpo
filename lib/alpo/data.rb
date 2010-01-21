@@ -11,7 +11,14 @@ module Alpo
       data = self
       options = HashWithIndifferentAccess.new(args.last.is_a?(Hash) ? args.pop : {})
 
-      @key = args.shift
+      @key = 
+        case args.size
+          when 0
+            options.keys.first if options.size==1
+          else
+            args.shift
+        end
+      @key ||= 'data'
       @errors = Errors.new(data)
       @form = Form.new(data)
       @status = Status.ok
@@ -29,10 +36,18 @@ module Alpo
     def valid?()
       errors.empty? and status.ok?
     end
+
+    def id
+      self[:id] || self[:_id]
+    end
+
+    def parse(params = {})
+      Alpo.parse(key, params)
+    end
   end
 
   def data(*args, &block)
-    args.push(:data) if args.empty? and block.nil?
+    #args.push(:data) if args.empty? and block.nil?
     data = Alpo::Data.new(*args)
     block.call(data) if block
     data

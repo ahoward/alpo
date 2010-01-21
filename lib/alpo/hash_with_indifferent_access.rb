@@ -15,7 +15,7 @@ module Alpo
 
     def default(key = nil)
       if key.is_a?(Symbol) && include?(key = key.to_s)
-        self[key]
+        convert_value(self[key])
       else
         super
       end
@@ -23,6 +23,10 @@ module Alpo
 
     alias_method :regular_writer, :[]= unless method_defined?(:regular_writer)
     alias_method :regular_update, :update unless method_defined?(:regular_update)
+
+    def [](key)
+      convert_value(super(convert_key(key)))
+    end
 
     # Assigns a new value to the hash:
     #
@@ -83,7 +87,7 @@ module Alpo
 
     # Returns an exact copy of the hash.
     def dup
-      HashWithIndifferentAccess.new(self)
+      self.class.new(self)
     end
 
     # Merges the instantized and the specified hashes together, giving precedence to the values from the second hash
@@ -95,7 +99,7 @@ module Alpo
     # Performs the opposite of merge, with the keys and values from the first hash taking precedence over the second.
     # This overloaded definition prevents returning a regular hash, if reverse_merge is called on a HashWithDifferentAccess.
     def reverse_merge(other_hash)
-      super with_indifferent_access(other_hash)
+      super coerce(other_hash)
     end
 
     # Removes a specified key from the hash.
@@ -113,13 +117,14 @@ module Alpo
     end
 
     def =~(other)
-      self == with_indifferent_access(other)
+      self == coerce(other)
     end
 
     protected
-      def with_indifferent_access(other = {})
-        return other if other.is_a?(HashWithIndifferentAccess)
-        coerced = HashWithIndifferentAccess.new.update(other)
+      def coerce(other = {})
+        klass = self.class
+        return other if other.is_a?(klass)
+        coerced = klass.new.update(other)
       end
 
       def convert_key(key)
@@ -128,12 +133,21 @@ module Alpo
 
       def convert_value(value)
         case value
-        when Hash
-          with_indifferent_access(value)
-        when Array
-          value.collect { |e| e.is_a?(Hash) ? with_indifferent_access(e) : e }
-        else
-          value
+          when Hash
+            coerce(value)
+
+          when Array
+            result = nil
+            value.each do |val|
+              if val.is_a?(Hash)
+                result ||= []
+                result.push(coerce(val))
+              end
+            end
+            result ||= value
+
+          else
+            value
         end
       end
   end
