@@ -137,6 +137,8 @@ module Alpo
             coerce(value)
 
           when Array
+            value.map!{|val| convert_value(val)}; value
+=begin
             result = nil
             value.each do |val|
               if val.is_a?(Hash)
@@ -145,6 +147,7 @@ module Alpo
               end
             end
             result ||= value
+=end
 
           else
             value

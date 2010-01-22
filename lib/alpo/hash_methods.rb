@@ -50,6 +50,7 @@ module Alpo
 
         keys.each_cons(2) do |a, b|
           a, b = key_for(a), key_for(b)
+
           case b
             when Numeric
               collection[a] ||= []
