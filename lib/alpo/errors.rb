@@ -90,21 +90,21 @@ module Alpo
       messages.each{|msg| yield msg}
     end
 
-    def to_html(*args, &block)
-      Errors.to_html(errors=self, *args, &block)
+    def to_html(*args)
+      Errors.to_html(errors=self, *args)
     end
 
     def Errors.to_html(*args, &block)
       if block
         define_method(:to_html, &block)
       else
-        errors_to_html(*args, &block)
+        errors_to_html(*args)
       end
     end
 
     def Errors.errors_to_html(*args)
-      options = Alpo.hash_for(args.last.is_a?(Hash) ? args.pop : {})
-      errors = args.flatten.compact
+      errors, args = args.partition{|arg| arg.is_a?(Errors)}
+      options = args.last.is_a?(Hash) ? args.pop : {}
 
       at_least_one = false
       names = errors.map{|e| e.data._name}
