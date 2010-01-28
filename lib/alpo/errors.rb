@@ -4,6 +4,9 @@ module Alpo
     include Tagz.globally
     extend Tagz.globally
 
+    All = '*'
+    Separator = ':'
+
     attr 'data'
 
     def initialize(data = Alpo.data)
@@ -16,7 +19,7 @@ module Alpo
       args.flatten!
       message = args.pop
       keys = args
-      keys = %w( * ) if keys.empty?
+      keys = [All] if keys.empty?
 
       if message
         if message.respond_to?(:full_messages)
@@ -72,7 +75,17 @@ module Alpo
         full_messages.push([key, value])
       end
 
-      full_messages.sort!{|a,b| a.first <=> b.first}
+      full_messages.sort! do |a,b|
+        a, b = a.first, b.first
+        if a == All
+          b == All ? 0 : -1
+        elsif b == All
+          a == All ? 0 : 1
+        else
+          a <=> b
+        end
+      end
+
       full_messages
     end
 
@@ -82,7 +95,7 @@ module Alpo
 
     def messages
       messages =
-        (self['*']||[]).map{|message| message.to_s}.
+        (self[All]||[]).map{|message| message.to_s}.
         select{|message| not message.strip.empty?}
     end
 
@@ -103,8 +116,9 @@ module Alpo
     end
 
     def Errors.errors_to_html(*args)
-      errors, args = args.partition{|arg| arg.is_a?(Errors)}
-      options = args.last.is_a?(Hash) ? args.pop : {}
+      error = args.shift
+      options = Alpo.hash_for(args.last.is_a?(Hash) ? args.pop : {})
+      errors = [error, *args].flatten.compact
 
       at_least_one = false
       names = errors.map{|e| e.data._name}
@@ -112,22 +126,64 @@ module Alpo
 
       html =
         table_(:class => klass){
-          caption_(:style => 'white-space:nowrap'){ 'Sorry, there were some errors' }
+          caption_(:style => 'white-space:nowrap'){ 'Sorry, there were some errors.' }
 
           tbody_{
             errors.each do |e|
               e.full_messages.each do |key, value|
                 at_least_one = true
                 key = key.to_s
-                key = key.respond_to?(:humanize) ? key.humanize: key.capitalize
-                tr_{
-                  td_(:class => 'key'){ key }
-                  td_(:class => 'separator'){ '&nbsp;:&nbsp;' }
-                  td_(:class => 'value'){ value }
-                }
+                if key == All
+                  # value = value.respond_to?(:humanize) ? value.humanize: value.capitalize
+                  tr_(:colspan => 3){
+                    td_(:class => 'all'){ value }
+                  }
+                else
+                  # key = key.respond_to?(:humanize) ? key.humanize: key.capitalize
+                  tr_{
+                    td_(:class => 'field'){ key }
+                    td_(:class => 'separator'){ Separator }
+                    td_(:class => 'message'){ value }
+                  }
+                end
               end
             end
           }
+        }
+
+      at_least_one ? html : ''
+    end
+
+    def Errors.errors_to_html(*args)
+      error = args.shift
+      options = Alpo.hash_for(args.last.is_a?(Hash) ? args.pop : {})
+      errors = [error, *args].flatten.compact
+
+      at_least_one = false
+      names = errors.map{|e| e.data._name}
+      klass = [names, 'alpo errors'].flatten.compact.join(' ')
+
+      html =
+        ul_(:class => klass){
+          h4_(:class => 'caption'){ 'Sorry, there were some errors.' }
+
+          errors.each do |e|
+            e.full_messages.each do |key, value|
+              at_least_one = true
+              key = key.to_s
+              if key == All
+                # value = value.respond_to?(:humanize) ? value.humanize: value.capitalize
+                li_(:class => 'all'){ span_(:class => :message){ value } }
+              else
+                # key = key.respond_to?(:humanize) ? key.humanize: key.capitalize
+                li_(:class => 'field'){
+                  span_(:class => 'field'){ key }
+                  span_(:class => 'separator'){ Separator }
+                  span_(:class => 'message'){ value }
+                }
+              end
+            end
+          end
         }
 
       at_least_one ? html : ''
