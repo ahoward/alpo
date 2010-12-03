@@ -1,42 +1,197 @@
 module Alpo
+  Alpo.libdir do
+    load 'api/mode.rb'
+    load 'api/endpoint.rb'
+    load 'api/route.rb'
+    load 'api/dsl.rb'
+  end
+
   class Api
-
-  # mode support
-  #
-    def Api.new(*args, &block)
-      api = allocate
-      api.instance_eval do
-        @mode = Mode.for(:read)
-        @catching = false
-        initialize(*args, &block)
+    class << Api
+      def new(*args, &block)
+        api = allocate
+        api.instance_eval do
+          before_initialize(*args, &block)
+          initialize(*args, &block)
+          after_initialize(*args, &block)
+        end
+        api
       end
-      api
+
+      def modes(*modes)
+        @modes ||= []
+        modes.flatten.compact.map{|mode| Api.add_mode(mode)} unless modes.empty?
+        @modes
+      end
+
+      def add_mode(mode)
+        modes.push(mode = Mode.for(mode)).uniq!
+        module_eval(<<-__, __FILE__, __LINE__ - 1)
+          def #{ mode }(*args, &block)
+            if args.empty?
+              mode(#{ mode.inspect }, &block)
+            else
+              mode(#{ mode.inspect }) do
+                call(*args, &block)
+              end
+            end
+          end
+
+          def #{ mode }?(&block)
+            mode?(#{ mode.inspect }, &block)
+          end
+        __
+        mode
+      end
+
+      def path_for(*paths)
+        path = [*paths].flatten.compact.join('/')
+        path.squeeze!('/')
+        path.sub!(%r|^/|, '')
+        path.sub!(%r|/$|, '')
+        path.split('/')
+      end
+
+      def absolute_path_for(*paths)
+        '/' + path_for(path, *paths).join('/')
+      end
+
+      def evaluate(&block)
+        @dsl ||= DSL.new(api=self)
+        @dsl.evaluate(&block)
+      end
+
+      def routes
+        @routes ||= Route::List.new
+      end
+
+      def endpoint(*args, &block)
+        args.flatten!
+        args.compact!
+        options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+
+        path = absolute_path_for(*args)
+
+        if Route.like?(path)
+          routes.add(path)
+        end
+
+        module_eval{ 
+          define_method(path + '/endpoint', &block)
+          arity = block.arity
+
+          define_method(path) do |*args|
+            params = Alpo.map_for(args.shift || {})
+            result = Alpo.data_for(path, args.shift || {})
+
+            args =
+              case arity
+                when 0
+                  []
+                when 1
+                  [params]
+                when 2
+                  [params, result]
+                else
+                  [params, result]
+              end
+
+            begin
+              @stack.params.push(params)
+              @stack.result.push(result)
+              catching{ send(path + '/endpoint', *args) }
+            ensure
+              @stack.params.pop
+              @stack.result.pop
+            end
+
+            result
+          end
+
+          public path
+        }
+
+        endpoint = instance_method(path)
+
+        annotate(endpoint, options.merge(:path => path))
+
+        endpoints[endpoint.path] = endpoint
+        endpoint
+      end
+
+      def annotate(endpoint, attributes = {})
+        attributes = Alpo.map_for(attributes)
+        endpoint.extend(Endpoint) unless endpoint.is_a?(Endpoint)
+
+        path = attributes[:path]
+        description = attributes[:description]
+        signature = attributes[:signature]
+
+        endpoint.path = path
+        endpoint.description = String(description || path)
+        endpoint.signature = Alpo.map_for(signature || {})
+
+        endpoint
+      end
+
+      alias_method('Endpoint', 'endpoint')
+
+      def endpoints
+        @endpoints ||= Map.new
+      end
+
+      def endpoint_for(*paths)
+        path = Api.absolute_path_for(*paths)
+        endpoint = endpoints[path]
+        raise(NameError, path) unless endpoint
+        endpoint
+      end
+
+      alias_method '[]', 'endpoint_for'
+
+      def path(*path)
+        self.path = path.first unless path.empty?
+        @path ||= 'api'
+      end
+
+      def path=(path)
+        @path = path.to_s
+      end
+
+      def description
+        description = []
+        endpoints.each do |path, endpoint|
+          m = Map.new
+          m['path'] = endpoint.path
+          m['description'] = endpoint.description
+          m['signature'] = {}.update(endpoint.signature) # HACK
+          description.push(m)
+        end
+        Alpo.data_for(path => description)
+      end
     end
 
-    class Mode < ::String
-      class << Mode
-        def for(mode)
-          mode.is_a?(Mode) ? mode : Mode.new(mode.to_s)
-        end
-      end
+    Api.modes('read', 'write')
 
-      Write = Mode.for(:write) unless defined?(Write)
-      Read = Mode.for(:read) unless defined?(Read)
-      Post = Write unless defined?(Post)
-      Get = Read unless defined?(Get)
-      Default = Read unless defined?(Default)
+    Stack = Struct.new(:params, :result)
 
-      class << Mode
-        %w( read write get post default ).each do |method|
-          define_method(method){ const_get(method.capitalize) }
-        end
-      end
-
-      def ==(other)
-        super(Mode.for(other))
-      end
+    def before_initialize(*args, &block)
+      @mode = Mode.for(:read)
+      @catching = false
+      @stack = Stack.new(params=[], result=[])
     end
 
+    def after_initialize(*args, &block)
+      :hook
+    end
+
+    def params
+      @stack.params.last
+    end
+
+    def result
+      @stack.result.last
+    end
 
     def mode=(mode)
       @mode = Mode.for(mode)
@@ -52,14 +207,14 @@ module Alpo
           mode = self.mode
           self.mode = args.shift
           begin
-            instance_eval(&block)
+            return instance_eval(&block)
           ensure
             self.mode = mode
           end
         else
           self.mode = args.shift
+          return self
         end
-        self
       end
     end
 
@@ -77,35 +232,11 @@ module Alpo
       end
     end
 
-    def Api.modes(*modes)
-      @modes ||= []
-      modes.flatten.compact.map{|mode| Api.add_mode(mode)} unless modes.empty?
-      @modes
-    end
-
-    def Api.add_mode(mode)
-      modes.push(mode = Mode.for(mode)).uniq!
-
-      module_eval <<-__
-        def #{ mode }(&block)
-          mode(#{ mode.inspect }, &block)
-        end
-        def #{ mode }?(&block)
-          mode?(#{ mode.inspect }, &block)
-        end
-      __
-
-      mode
-    end
-
-    Api.modes('read', 'write')
-
     alias_method 'get', 'read'
     alias_method 'get?', 'read?'
 
     alias_method 'post', 'write'
     alias_method 'post?', 'write?'
-
 
     def catching(label = :result, &block)
       catching = @catching
@@ -119,91 +250,72 @@ module Alpo
       @catching
     end
 
-  # namespace support
-  #
-    attr_accessor :namespace
+    def absolute_path_for(*paths)
+      Api.absolute_path_for(*paths)
+    end
 
-    class Namespace < Module
-      def method_added(method)
-        private(method)
-      end
-
-      def endpoint(name, &block)
-        name = name.to_s
-        impl = name + '_impl'
-        define_method(name) do |*args|
-          args.push(HashWithIndifferentAccess.new) if args.empty?
-          catching{ send(impl, *args) }
+    def endpoints
+      unless defined?(@endpoints)
+        @endpoints ||= Map.new
+        self.class.endpoints.each do |path, endpoint|
+          @endpoints[endpoint.path] = endpoint.bind(self)
         end
-        define_method(impl, &block)
-        public(name)
       end
-      alias_method('Endpoint', 'endpoint')
+      @endpoints
+    end
 
-      def name
-        @name
+    def route_for(*args)
+      self.class.routes.match(*args)
+    end
+
+    def call(*args)
+      params = result = nil
+      if args.last.is_a?(Hash)
+        result = Alpo.map_for(args.pop)
       end
-
-      def inspect
-        "Namespace(#{ name })"
+      if args.last.is_a?(Hash)
+        params = Alpo.map_for(args.pop)
       end
-
-      def Namespace.new(name, &block)
-        namespace = super(&block)
-      ensure
-        namespace.instance_eval{ @name = name }
+      if params.nil? and result
+        params = result
+        result = nil
       end
-   end
+      params ||= Alpo.hash
+      result ||= Alpo.hash
 
-    class << Api
-      def Namespace(name, &block)
-        name = name.to_s.downcase.strip
+      path = Api.absolute_path_for(*args)
+      endpoint = endpoints[path]
 
-        namespace = namespaces[name]
-
-        if block
-          if namespace
-            namespace.module_eval(&block)
-          else
-            namespace = namespaces[name] = Namespace.new(name, &block)
-
-            module_eval <<-__
-              def #{ name }(&block)
-                namespaced = self.dup
-                namespace = self.class.namespaces[#{ name.inspect }]
-                namespaced.extend(namespace)
-                namespaced.namespace = namespace
-                if block
-                  namespaced.instance_eval(&block)
-                else
-                  namespaced
-                end
-              end
-            __
-          end
-        end
-
-        namespace
-      end
-      alias_method 'namespace', 'Namespace'
-
-      def namespaces
-        @namespaces ||= Hash.new
+      if endpoint.nil?
+        route = route_for(path)
+        params.update(route.params)
+        path = route.path
+        endpoint = endpoints[path]
       end
 
-      def endpoint(name, &block)
-        define_method(name, &block)
-      #ensure
-        #(endpoints << name).uniq!
-      end
+      raise(NameError, path) unless endpoint
 
-      def endpoints
-        @endpoints ||= []
-      end
+      endpoint.call(params, result)
+    end
+
+    alias_method '[]', 'call'
+
+    def description
+      self.class.description
+    end
+
+    def respond_to?(*args)
+      super(*args) || super(absolute_path_for(*args))
     end
   end
 
   def api(&block)
-    block ? Class.new(Api, &block) : Api
+    if block
+      api = Class.new(Api)
+      api.evaluate(&block)
+      api
+    else
+      Api
+    end
   end
 end

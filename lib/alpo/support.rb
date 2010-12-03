@@ -1,51 +1,34 @@
 module Alpo
-# TODO - factor this out into 'util' or some such
-#
-  def normalized_hash(hash = {})
-    HashWithIndifferentAccess.new.update(hash)
+  def map_for(*args, &block)
+    Map.for(*args, &block)
   end
-  alias_method 'hash_for', 'normalized_hash'
+  alias_method(:hash, :map_for)
+  alias_method(:map, :map_for)
 
-  def depth_first_each(enumerable, path = [], accum = [], &block)
-    Alpo.each_pair(enumerable) do |key, val|
-      path.push(key)
-      if val.is_a?(Hash) or val.is_a?(Array)
-        Alpo.depth_first_each(val, path, accum) # recurse
-      else
-        accum << [path.dup, val]
-      end
-      path.pop()
-    end
-    if block
-      accum.each{|keys, val| block.call(keys, val)}
-    else
-      [path, accum]
-    end
+  def data_for(*args, &block)
+    Data.for(*args, &block)
+  end
+  alias_method(:data, :data_for)
+
+  def apply(*args)
+    Data.apply(*args)
   end
 
-  def each_pair(enumerable, *args, &block)
-    case enumerable
-      when Hash
-        enumerable.each_pair(*args, &block)
+  def build(*args)
+    Data.build(*args)
+  end
+
+  def to_alpo(object, *args, &block)
+    case object
       when Array
-        enumerable.each_with_index(*args) do |val, key|
-          block.call(key, val)
-        end
+        object.map{|element| Alpo.to_alpo(element)}
+
       else
-        enumerable.each_pair(*args, &block)
+        if object.respond_to?(:to_alpo)
+          object.send(:to_alpo, *args, &block)
+        else
+          object
+        end
     end
-  end
-
-  def key_for(key)
-    return key if Numeric===key
-    key.to_s =~ %r/^\d+$/ ? Integer(key) : key
-  end
-
-  def underscore(camel_cased_word)
-    camel_cased_word.to_s.gsub(/::/, '/').
-      gsub(/([A-Z]+)([A-Z][a-z])/,'\1_\2').
-      gsub(/([a-z\d])([A-Z])/,'\1_\2').
-      tr("-", "_").
-      downcase
   end
 end

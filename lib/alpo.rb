@@ -1,9 +1,12 @@
-# built-in libs
+# built-ins
 #
   require 'enumerator'
+  require 'fileutils'
   require 'pathname'
+  require 'yaml'
+  require 'yaml/store'
 
-# rubygem libs
+# gems
 #
   begin
     require 'rubygems'
@@ -12,13 +15,19 @@
   end
 
   require 'tagz'
-  #require 'orderedhash'
-  require 'json'
+  require 'map'
+
+  begin
+    gem 'json'
+    load 'json.rb'
+  rescue Object
+    nil
+  end
 
 # alpo libs
 #
   module Alpo
-    Version = '0.4.2' unless defined?(Version)
+    Version = '2.0.0' unless defined?(Version)
 
     def version
       Alpo::Version
@@ -42,15 +51,34 @@
   end
 
   Alpo.libdir do
+    #load 'json.rb'
+    load 'blankslate.rb'
     load 'exceptions.rb'
     load 'support.rb'
     load 'status.rb'
-    load 'hash_with_indifferent_access.rb'
-    load 'hash_methods.rb'
+    load 'map.rb'
     load 'data.rb'
-    load 'data/form.rb'
+    load 'form.rb'
     load 'errors.rb'
+    load 'validations.rb'
     load 'slug.rb'
-    load 'parameter_parser.rb'
+    load 'params.rb'
     load 'api.rb'
+    load 'rails.rb'
+    load 'active_record.rb'
+    load 'mongo_mapper.rb'
+    load 'stdext.rb'
+    load 'db.rb'
+  end
+
+  unless defined?(A)
+    A = Alpo
+
+    def Alpo(*args, &block)
+      Alpo.data(*args, &block)
+    end
+
+    def A(*args, &block)
+      Alpo.data(*args, &block)
+    end
   end

@@ -1,11 +1,34 @@
 module Alpo
-  class Errors < HashWithIndifferentAccess
-    include HashMethods
-    include Tagz.globally
-    extend Tagz.globally
+  class Errors < Map
+    Global = '*' unless defined?(Global)
+    Separator = ':' unless defined?(Separator)
 
-    All = '*'
-    Separator = ':'
+    class Message < ::String
+      attr_accessor :sticky
+
+      def initialize(*args)
+        options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+        replace(args.join(' '))
+        @sticky = options[:sticky]
+      end
+
+      def sticky?
+        @sticky ||= nil
+        !!@sticky
+      end
+
+      def to_yaml(*args, &block)
+        to_str.to_yaml(*args, &block)
+      end
+    end
+
+    def to_yaml(*args, &block)
+      Hash.new.update(self).to_yaml(*args, &block)
+    end
+
+    def Errors.global_key
+      [Global]
+    end
 
     attr 'data'
 
@@ -13,35 +36,111 @@ module Alpo
       @data = data
     end
 
+    def status(*args)
+      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+      sticky = options.has_key?(:sticky) ? options[:sticky] : true
+      status = Status.for(*args)
+      msg = Message.new(status, :sticky => sticky)
+      key = 'Status'
+      delete(key)
+      add(key, msg) unless status.ok?
+      status
+    end
+
+    def status=(*args)
+      status(*args)
+    end
+
     def add(*args)
-      options = Alpo.hash_for(args.last.is_a?(Hash) ? args.pop : {})
+      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+      sticky = options[:sticky]
+      clear = options[:clear]
 
       args.flatten!
       message = args.pop
       keys = args
-      keys = [All] if keys.empty?
+      keys = [Global] if keys.empty?
+      errors = Hash.new
+
+      if Array(keys) == [Global]
+        sticky = true unless options.has_key?(:sticky)
+      end
+
+      sticky = true if(message.respond_to?(:sticky?) and message.sticky?)
 
       if message
         if message.respond_to?(:full_messages)
-          message.each do |key, msg|
-            options[key] = msg.to_s
+          message.depth_first_each do |keys, msg|
+            errors[keys] = Message.new(msg, :sticky => sticky)
           end
         else
-          options[keys] = message.to_s
+          errors[keys] = Message.new(message, :sticky => sticky)
         end
       end
 
-      options.each do |keys, message|
+      result = []
+
+      errors.each do |keys, message|
         list = get(keys)
         unless get(keys)
           set(keys => [])
           list = get(keys)
         end
+        list.clear if clear
         list.push(message)
+        result = list
+      end
+      
+      result
+    end
+    alias_method 'add_to_base', 'add'
+
+    def clone
+      clone = Errors.new(data)
+      depth_first_each do |keys, message|
+        args = [*keys]
+        args.push(message)
+        clone.add(*args)
+      end
+      clone
+    end
+
+    def add!(*args)
+      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+      options[:sticky] = true
+      args.push(options)
+      add(*args)
+    end
+    alias_method 'add_to_base!', 'add!'
+
+    alias_method 'clear!', 'clear' unless instance_methods.include?('clear!')
+
+    def update(other, options = {})
+      options = Alpo.map_for(options)
+      prefix = Array(options[:prefix]).flatten.compact
+
+      other.each do |key, val|
+        key = key.to_s
+        if key == 'base' or key == Global
+          add!(val)
+        else
+          key = prefix + [key] unless prefix.empty?
+          add(key, val)
+        end
       end
     end
 
-    alias_method 'add_to_base', 'add'
+    def clear
+      keep = []
+      depth_first_each do |keys, message|
+        index = keys.pop
+        args = [keys, message].flatten
+        keep.push(args) if message.sticky?
+      end
+      clear!
+    ensure
+      keep.each{|args| add!(*args)}
+    end
 
     def invalid?(*keys)
       !get(keys).nil?
@@ -51,13 +150,9 @@ module Alpo
 
     alias_method 'on', 'get'
 
-    def each(&block)
-      Alpo.depth_first_each(enumerable=self, &block)
-    end
-
     def size
       size = 0
-      Alpo.depth_first_each(enumerable=self){ size += 1 }
+      depth_first_each{ size += 1 }
       size
     end
 
@@ -77,10 +172,10 @@ module Alpo
 
       full_messages.sort! do |a,b|
         a, b = a.first, b.first
-        if a == All
-          b == All ? 0 : -1
-        elsif b == All
-          a == All ? 0 : 1
+        if a == Global
+          b == Global ? 0 : -1
+        elsif b == Global
+          a == Global ? 0 : 1
         else
           a <=> b
         end
@@ -89,18 +184,25 @@ module Alpo
       full_messages
     end
 
-    def each_full
+    def each_message
+      depth_first_each do |keys, message|
+        index = keys.pop
+        message = message.to_s.strip
+        next if message.empty?
+        yield(keys, message)
+      end
+    end
+
+    def each_full_message
       full_messages.each{|msg| yield msg}
     end
 
+    alias_method 'each_full', 'each_full_message'
+
     def messages
       messages =
-        (self[All]||[]).map{|message| message.to_s}.
+        (self[Global]||[]).map{|message| message}.
         select{|message| not message.strip.empty?}
-    end
-
-    def each_message
-      messages.each{|msg| yield msg}
     end
 
     def to_html(*args)
@@ -117,76 +219,37 @@ module Alpo
 
     def Errors.errors_to_html(*args)
       error = args.shift
-      options = Alpo.hash_for(args.last.is_a?(Hash) ? args.pop : {})
+      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
       errors = [error, *args].flatten.compact
 
       at_least_one = false
-      names = errors.map{|e| e.data._name}
-      klass = [names, 'alpo errors'].flatten.compact.join(' ')
+      slugs = errors.map{|e| e.data.slug}
+      klass = [slugs, 'alpo errors'].flatten.compact.join(' ')
 
-      html =
-        table_(:class => klass){
-          caption_(:style => 'white-space:nowrap'){ 'Sorry, there were some errors.' }
+      html = []
 
-          tbody_{
-            errors.each do |e|
-              e.full_messages.each do |key, value|
-                at_least_one = true
-                key = key.to_s
-                if key == All
-                  # value = value.respond_to?(:humanize) ? value.humanize: value.capitalize
-                  tr_(:colspan => 3){
-                    td_(:class => 'all'){ value }
-                  }
-                else
-                  # key = key.respond_to?(:humanize) ? key.humanize: key.capitalize
-                  tr_{
-                    td_(:class => 'field'){ key }
-                    td_(:class => 'separator'){ Separator }
-                    td_(:class => 'message'){ value }
-                  }
-                end
-              end
-            end
-          }
-        }
-
-      at_least_one ? html : ''
-    end
-
-    def Errors.errors_to_html(*args)
-      error = args.shift
-      options = Alpo.hash_for(args.last.is_a?(Hash) ? args.pop : {})
-      errors = [error, *args].flatten.compact
-
-      at_least_one = false
-      names = errors.map{|e| e.data._name}
-      klass = [names, 'alpo errors'].flatten.compact.join(' ')
-
-      html =
-        ul_(:class => klass){
-          h4_(:class => 'caption'){ 'Sorry, there were some errors.' }
-
-          errors.each do |e|
-            e.full_messages.each do |key, value|
-              at_least_one = true
-              key = key.to_s
-              if key == All
-                # value = value.respond_to?(:humanize) ? value.humanize: value.capitalize
-                li_(:class => 'all'){ span_(:class => :message){ value } }
-              else
-                # key = key.respond_to?(:humanize) ? key.humanize: key.capitalize
-                li_(:class => 'field'){
-                  span_(:class => 'field'){ key }
-                  span_(:class => 'separator'){ Separator }
-                  span_(:class => 'message'){ value }
-                }
-              end
+      html.push("<ul class='#{ klass }'>")
+      html.push("<h4 class='caption'>Sorry, there were some errors.</h4>")
+        errors.each do |e|
+          e.full_messages.each do |key, value|
+            at_least_one = true
+            key = key.to_s
+            if key == Global
+              html.push("<li class='all'>")
+                html.push("<span class='message'>#{ value }</span>")
+              html.push("</li>")
+            else
+              html.push("<li class='field'>")
+                html.push("<span class='field'>#{ key }</span>")
+                html.push("<span class='separator'>#{ Separator }</span>")
+                html.push("<span class='message'>#{ value }</span>")
+              html.push("</li>")
             end
           end
-        }
+        end
+      html.push("</ul>")
 
-      at_least_one ? html : ''
+      at_least_one ? html.join("\n") : ''
     end
 
     def to_s(*args, &block)

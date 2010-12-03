@@ -42,6 +42,7 @@ module Alpo
         415 => "Unsupported Media Type",
         416 => "Requested Range Not Satisfiable",
         417 => "Expectation Failed",
+        420 => "Enhance Your Calm",
         422 => "Unprocessable Entity",
         423 => "Locked",
         424 => "Failed Dependency",
@@ -58,9 +59,18 @@ module Alpo
       }
     ) unless defined?(Code2Message)
 
+    def Status.underscore(camel_cased_word)
+      camel_cased_word.to_s.gsub(/::/, '/').
+        gsub(/([A-Z]+)([A-Z][a-z])/,'\1_\2').
+        gsub(/([a-z\d])([A-Z])/,'\1_\2').
+        #gsub(/\s+/, '').
+        tr("-", "_").
+        downcase
+    end
+
     Symbol2Code = (
       Code2Message.inject(Hash.new) do |hash, (code, message)|
-        sym = Alpo.underscore(message.gsub(/\s+/, "")).to_sym
+        sym = Status.underscore(message.gsub(/\s+/, "")).to_sym
         hash.update(sym => code)
       end
     ) unless defined?(Symbol2Code)
@@ -77,7 +87,14 @@ module Alpo
     attr :message
     attr :group
 
-    def initialize(code, message)
+    def initialize(*args)
+      code, message =
+        if args.size == 2
+          [args.first, args.last]
+        else
+          status = Status.for(args.first || 200)
+          [status.code, status.message]
+        end
       @code, @message = Integer(code), String(message)
       @group = (@code / 100) * 100
       replace("#{ @code } #{ @message }".strip)
@@ -113,6 +130,19 @@ module Alpo
     end
     alias_method 'error?', 'bad?'
 
+    def ==(other)
+      begin
+        other = Status.for(other)
+        self.code == other.code and self.message == other.message
+      rescue
+        false
+      end
+    end
+
+    def clone
+      clone = Status.for(code)
+    end
+
     def Status.for(*args)
       if args.size >= 2
         code = args.shift
@@ -127,13 +157,14 @@ module Alpo
             code = arg
             message = Code2Message[code]
             new(code, message)
-          when Symbol
-            code = Symbol2Code[arg]
+          when Symbol, String
+            sym = Status.underscore(arg).to_sym
+            code = Symbol2Code[sym]
             if code
               message = Code2Message[code]
             else
               code = 500
-              message = "Unknown Status #{ arg.inspect }"
+              message = "Unknown Status #{ arg }"
             end
             new(code, message)
           else

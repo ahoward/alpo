@@ -1,12 +1,25 @@
-. have valid check status?
-. select form inputs
-. README/doc
+todo:
+  - base/example api controller
+  - base/example application helper
+  - base/example api
+
+  - nested AR conversions
+      to_alpo(:a, :b => [:foo, :bar])
+
+  - json/pretty fix baked in?
+
+  - re-visit how parameters are parsed, perhaps we just use rack?
 
 
-x do something non sucky with status
-x name => key?
-x consider moving status/name/etc up
-x do not require status to be a number
-x have dsl support concept of 'endpoint' (public method)
-x reconsider have _name and _id in the hash because it makes iteration suck
-x re-evaluate css class names and ids
+
+
+done:
+  - name -> path
+  - tagz for html methods?
+  - data aquires the name/path of the method?
+  - endpoints are objects that respond to call.  namespaces respond to call.
+    api responds to call
+  - nested namespaces
+  - routing for path_info + mode 
+      route(path_info, :mode => mode, :params => params)
+  - call() on namespaces AND endpoints... why?
