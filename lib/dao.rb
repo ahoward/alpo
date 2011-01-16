@@ -10,27 +10,24 @@
 #
   begin
     require 'rubygems'
+    gem 'map', '~> 2.0'
+    gem 'tagz', '~> 8.0'
+    gem 'yajl-ruby'
   rescue LoadError
     nil
   end
 
-  require 'tagz'
   require 'map'
+  require 'tagz'
+  require 'yajl'
 
-  begin
-    gem 'json'
-    load 'json.rb'
-  rescue Object
-    nil
-  end
-
-# alpo libs
+# dao libs
 #
-  module Alpo
+  module Dao
     Version = '2.0.0' unless defined?(Version)
 
     def version
-      Alpo::Version
+      Dao::Version
     end
 
     def libdir(*args, &block)
@@ -50,19 +47,23 @@
     extend self
   end
 
-  Alpo.libdir do
+  Dao.libdir do
     #load 'json.rb'
     load 'blankslate.rb'
     load 'exceptions.rb'
     load 'support.rb'
-    load 'status.rb'
     load 'map.rb'
+    load 'slug.rb'
+
+    load 'path.rb'
+    load 'params.rb'
+    load 'result.rb'
+    load 'status.rb'
     load 'data.rb'
     load 'form.rb'
     load 'errors.rb'
     load 'validations.rb'
-    load 'slug.rb'
-    load 'params.rb'
+
     load 'api.rb'
     load 'rails.rb'
     load 'active_record.rb'
@@ -72,13 +73,13 @@
   end
 
   unless defined?(A)
-    A = Alpo
+    A = Dao
 
-    def Alpo(*args, &block)
-      Alpo.data(*args, &block)
+    def Dao(*args, &block)
+      Dao.data(*args, &block)
     end
 
     def A(*args, &block)
-      Alpo.data(*args, &block)
+      Dao.data(*args, &block)
     end
   end

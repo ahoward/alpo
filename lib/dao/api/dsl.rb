@@ -1,4 +1,11 @@
-module Alpo
+module Dao
+  class << Api
+    def evaluate(&block)
+      @dsl ||= DSL.new(api=self)
+      @dsl.evaluate(&block)
+    end
+  end
+
   class Api
     class DSL < BlankSlate
       attr_accessor :api
@@ -16,11 +23,24 @@ module Alpo
         api.endpoint(*args, &block)
       end
 
-      alias_method('Endpoint', 'endpoint')
+      def Endpoint(*args, &block)
+        api.Endpoint(*args, &block)
+      end
 
       def path(path)
         api.path = path.to_s
       end
     end
   end
+
+  def Dao.api(&block)
+    if block
+      api = Class.new(Api)
+      api.evaluate(&block)
+      api
+    else
+      Api
+    end
+  end
 end
+

@@ -1,5 +1,5 @@
-module Alpo
-  class Errors < Map
+module Dao
+  class Errors < Dao::Map
     Global = '*' unless defined?(Global)
     Separator = ':' unless defined?(Separator)
 
@@ -7,7 +7,7 @@ module Alpo
       attr_accessor :sticky
 
       def initialize(*args)
-        options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+        options = Dao.map_for(args.last.is_a?(Hash) ? args.pop : {})
         replace(args.join(' '))
         @sticky = options[:sticky]
       end
@@ -26,33 +26,43 @@ module Alpo
       Hash.new.update(self).to_yaml(*args, &block)
     end
 
-    def Errors.global_key
-      [Global]
+    class << Errors
+      def global_key
+        [Global]
+      end
+
+      def for(*args, &block)
+        new(*args, &block)
+      end
+
+      def cast(*args)
+        if args.size == 1
+          value = args.first
+          value.is_a?(self) ? value : self.for(value)
+        else
+          self.for(*args)
+        end
+      end
     end
 
-    attr 'data'
+    attr_accessor :result
 
-    def initialize(data = Alpo.data)
-      @data = data
+    def initialize(*args, &block)
+      @result = args.shift if args.first.is_a?(Result)
+      super
     end
 
-    def status(*args)
-      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
-      sticky = options.has_key?(:sticky) ? options[:sticky] : true
-      status = Status.for(*args)
-      msg = Message.new(status, :sticky => sticky)
-      key = 'Status'
-      delete(key)
-      add(key, msg) unless status.ok?
-      status
+    def clone_for(result)
+      Errors
     end
 
-    def status=(*args)
-      status(*args)
+    def data
+      raise "no result.data!" unless result
+      result.data
     end
 
     def add(*args)
-      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+      options = Dao.map_for(args.last.is_a?(Hash) ? args.pop : {})
       sticky = options[:sticky]
       clear = options[:clear]
 
@@ -96,7 +106,7 @@ module Alpo
     alias_method 'add_to_base', 'add'
 
     def clone
-      clone = Errors.new(data)
+      clone = Errors.for(result)
       depth_first_each do |keys, message|
         args = [*keys]
         args.push(message)
@@ -106,7 +116,7 @@ module Alpo
     end
 
     def add!(*args)
-      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+      options = Dao.map_for(args.last.is_a?(Hash) ? args.pop : {})
       options[:sticky] = true
       args.push(options)
       add(*args)
@@ -116,7 +126,7 @@ module Alpo
     alias_method 'clear!', 'clear' unless instance_methods.include?('clear!')
 
     def update(other, options = {})
-      options = Alpo.map_for(options)
+      options = Dao.map_for(options)
       prefix = Array(options[:prefix]).flatten.compact
 
       other.each do |key, val|
@@ -219,12 +229,12 @@ module Alpo
 
     def Errors.errors_to_html(*args)
       error = args.shift
-      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+      options = Dao.map_for(args.last.is_a?(Hash) ? args.pop : {})
       errors = [error, *args].flatten.compact
 
       at_least_one = false
-      slugs = errors.map{|e| e.data.slug}
-      klass = [slugs, 'alpo errors'].flatten.compact.join(' ')
+      slugs = errors.map{|e| Slug.for(e.data.path)}
+      klass = [slugs, 'dao errors'].flatten.compact.join(' ')
 
       html = []
 

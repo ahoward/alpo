@@ -2,115 +2,90 @@ testdir = File.dirname(File.expand_path(__FILE__))
 rootdir = File.dirname(testdir)
 libdir = File.join(rootdir, 'lib')
 
-require File.join(testdir, 'testing')
 require File.join(libdir, 'alpo')
+require File.join(testdir, 'testing')
+require File.join(testdir, 'helper')
 
 
 Testing Alpo do
+# api
+#
+  testing 'that an api class for your application can be built using a simple dsl' do
+    assert{
+      api_class =
+        Alpo.api do
+          ### dsl
+        end
+    }
+  end
+
+  testing 'that apis have a base/default path' do
+    api_class =
+      assert{
+        Alpo.api do
+          path '/API'
+        end
+      }
+    assert{ api_class.path == '/API' }
+    assert{ api_class.evaluate{ path '/api' } }
+    assert{ api_class.path == '/api' }
+  end
+
+  testing 'that apis can have callable endpoints added to them which accept params and return results' do
+    captured = []
+
+    api_class =
+      assert{
+        Alpo.api do
+          endpoint(:foo) do |params, result|
+            captured.push(params, result)
+          end
+        end
+      }
+    api = assert{ api_class.new }
+    assert{ api.respond_to?(:foo) }
+    result = assert{ api.call(:foo, {}) }
+    assert{ result.is_a?(Alpo::Result) }
+  end
+
+  testing 'that endpoints are automatically called according to arity' do
+    api = assert{ Class.new(Alpo.api) }
+    assert{ api.class_eval{ endpoint(:zero){|| result.update :args => [] } } }
+    assert{ api.class_eval{ endpoint(:one){|a| result.update :args => [a]} } }
+    assert{ api.class_eval{ endpoint(:two){|a,b| result.update :args => [a,b]} } }
+
+    assert{ api.new.call(:zero).args.size == 0 }
+    assert{ api.new.call(:one).args.size == 1 }
+    assert{ api.new.call(:two).args.size == 2 }
+  end
+
+  testing 'that endpoints have an auto-vivifying params/result' do
+    api = assert{ Class.new(Alpo.api) }
+    assert{ api.class_eval{ endpoint(:foo){ params; result; } } }
+    result = assert{ api.new.call(:foo) }
+    assert{ result.path.to_s =~ /foo/ }
+  end
+
+  testing 'that methods with route requirements can be defined' do
+    api = assert{ Class.new(Alpo.api) }
+    assert{ api.class_eval{ endpoint('/foo/:foo/bar/:bar/:baz'){ result.update(params) } } }
+    result = assert{ api.new.call('/foo/42/bar/42.0/forty-two') }
+    assert{ result[:foo] = '42' }
+    assert{ result[:bar] = '42.0' }
+    assert{ result[:baz] = 'forty-two' }
+    assert{ result.path.to_s =~ %r|/foo/:foo/bar/:bar/:baz| }
+  end
+
+# results
+#
+  testing 'that results can be created with a path' do
+    result = assert{ Alpo::Result.new('/path') }
+    assert{ result.path == '/path' }
+  end
 
 # data
 #
-  testing 'basic data can be constructed' do
-    data = assert{ Alpo.data.new }
-  end
-  testing 'basic data can be constructed with a path' do
-    data = assert{ Alpo.data.new('path') }
-    assert{ data.path == 'path' }
-  end
-  testing 'data can be constructed with values' do
-    data = assert{ Alpo.data.new(:key => :value) }
-    #assert{ data.key == nil }
-    #assert{ data._id == nil }
-    assert{ data =~ {:key => :value} }
-  end
-  testing 'indifferent access' do
-    data = assert{ Alpo.data.new(:key => :value) }
-    assert{ data =~ {:key => :value} }
-    assert{ data[:key] == :value }
-    assert{ data['key'] == :value }
-  end
-  testing 'nested indifferent access' do
-    data = assert{ Alpo.data.new(:a => {:b => :value}) }
-    assert{ data =~ {:a => {:b => :value}} }
-    assert{ data[:a] =~ {:b => :value} }
-    assert{ data['a'] =~ {:b => :value} }
-    assert{ data[:a][:b] == :value }
-    assert{ data[:a]['b'] == :value }
-  end
-  testing 'deeply nested indifferent access' do
-    data = assert{ Alpo.data.new(:x => {:y => {:z => :value}}) }
-    assert{ data =~ {:x => {:y => {:z => :value}}} }
-    assert{ data[:x] =~ {:y => {:z => :value}} }
-    assert{ data['x'] =~ {:y => {:z => :value}} }
-    assert{ data[:x][:y] =~ {:z => :value} }
-    assert{ data[:x]['y'] =~ {:z => :value} }
-    assert{ data[:x][:y][:z] == :value }
-    assert{ data[:x][:y]['z'] == :value }
-  end
-  testing 'setting/getting a deeply nested value' do
-    data = assert{ Alpo.data.new }
-    assert{ data.set([:a,:b,:c] => 42) }
-    assert{ data =~ {:a => {:b => {:c => 42}}} }
-    assert{ data.get(:a,:b,:c) == 42 }
-  end
-  testing 'setting/getting a deeply nested array' do
-    data = assert{ Alpo.data.new }
-    assert{ data.set([:a,:b,0] => 40) }
-    assert{ data.set([:a,:b,1] => 2) }
-    assert{ data =~ {:a => {:b => [40,2]}} }
-    assert{ data.get(:a,:b) == [40,2] }
-  end
-  testing 'depth first traversal' do
-    data = assert{ Alpo.data.new }
-    assert{ data.set(:A => 42) }
-    assert{ data.set(:Z => 42.0) }
-    assert{ data.set([:a,:b,0] => 40) }
-    assert{ data.set([:a,:b,1] => 2) }
 
-    pairs = []
-    assert{
-      data.depth_first_each do |keys, val|
-        pairs.push([keys, val])
-      end
-      true
-    }
-    expected = [
-      [["A"], 42],
-      [["Z"], 42.0],
-      [["a", "b", 0], 40],
-      [["a", "b", 1], 2]
-    ]
-    assert{ expected == pairs.sort }
-  end
-  testing 'converting data with numeric keys into an array' do
-    data = Alpo.data(:array)
-    assert{
-      data.set(
-        0 => 40,
-        1 => 2
-      )
-    }
-    assert{ data.as_array == [40,2] }
-  end
-  testing "new?/has_id? on data" do
-    d = Alpo.data
-    assert{ !d.has_id? }
-    assert{ d.new? }
-    d = Alpo.data(:id => 42)
-    assert{ d.has_id? }
-    assert{ !d.new? }
-  end
-  testing "blank? on empty data" do
-    assert{ Alpo.data.blank? }
-  end
-  testing "blank? on non-empty, but blank, data" do
-    assert{ Alpo.data(:key => nil).blank? }
-    assert{ Alpo.data(:key => []).blank? }
-    assert{ Alpo.data(:key => {}).blank? }
-    assert{ Alpo.data(:key => 0).blank? }
-    assert{ Alpo.data(:key => [[nil],[[]]]).blank? }
-    assert{ Alpo.data(:key => {:a => nil}).blank? }
-  end
 
 # status
 #
@@ -125,14 +100,20 @@ Testing Alpo do
     assert{ Alpo::Status.for(:no_content).code == 204 }
   end
 
-  testing 'that setting status alters errors automatically' do
-    d = Alpo.data
-    assert{ d.status :unauthorized }
-    assert{ not d.errors.empty? }
-    assert{ d.errors.to_html.index(d.status) }
-    assert{ d.errors.status :ok }
-    assert{ d.errors.empty? }
+  testing 'that setting the status of a result alters errors automatically' do
+    result = Alpo::Result.new
+    assert{ result.status :unauthorized }
+    #d = Alpo.data
+    #assert{ d.status :unauthorized }
+    #assert{ not d.errors.empty? }
+    #assert{ d.errors.to_html.index(d.status) }
+    #assert{ d.errors.status :ok }
+    #assert{ d.errors.empty? }
   end
+
+=begin
+
+
 
   testing 'status equality operator' do
     s = Alpo::Status.for(401)
@@ -311,44 +292,7 @@ Testing Alpo do
     assert{ data == clone }
   end
 
-# api
-#
-  testing 'that the api dsl allows endpoint definition' do
-    api_class = assert{ Class.new(Alpo.api) }
-    assert{
-      api_class.class_eval{ endpoint(:foo){} }
-    }
-    api = nil
-    assert{ api = api_class.new }
-    assert{ api.respond_to?(:foo) }
-    assert{ api.call(:foo) }
-  end
-  testing 'that endpoints are called according to arity' do
-    api = assert{ Class.new(Alpo.api) }
-    assert{ api.class_eval{ endpoint(:zero){|| result.update :args => [] } } }
-    assert{ api.class_eval{ endpoint(:one){|a| result.update :args => [a]} } }
-    assert{ api.class_eval{ endpoint(:two){|a,b| result.update :args => [a,b]} } }
 
-    assert{ api.new.call(:zero).args.size == 0 }
-    assert{ api.new.call(:one).args.size == 1 }
-    assert{ api.new.call(:two).args.size == 2 }
-  end
-  testing 'that endpoints have magic params and result objects' do
-    api = assert{ Class.new(Alpo.api) }
-    assert{ api.class_eval{ endpoint(:foo){ params; result; } } }
-    result = assert{ api.new.call(:foo) }
-    assert{ result.path.to_s =~ /foo/ }
-  end
-
-  testing 'that methods with requirements can be defined' do
-    api = assert{ Class.new(Alpo.api) }
-    assert{ api.class_eval{ endpoint('/foo/:foo/bar/:bar/:baz'){ result.update(params) } } }
-    result = assert{ api.new.call('/foo/42/bar/42.0/forty-two') }
-    assert{ result[:foo] = '42' }
-    assert{ result[:bar] = '42.0' }
-    assert{ result[:baz] = 'forty-two' }
-    assert{ result.path.to_s =~ %r|/foo/:foo/bar/:bar/:baz| }
-  end
-
+=end
 
 end

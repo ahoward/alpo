@@ -1,4 +1,4 @@
-module Alpo
+module Dao
   def map_for(*args, &block)
     Map.for(*args, &block)
   end
@@ -10,6 +10,14 @@ module Alpo
   end
   alias_method(:data, :data_for)
 
+  def options_for!(args)
+    Map.options_for!(args)
+  end
+
+  def options_for(args)
+    Map.options_for(args)
+  end
+
   def apply(*args)
     Data.apply(*args)
   end
@@ -18,14 +26,14 @@ module Alpo
     Data.build(*args)
   end
 
-  def to_alpo(object, *args, &block)
+  def to_dao(object, *args, &block)
     case object
       when Array
-        object.map{|element| Alpo.to_alpo(element)}
+        object.map{|element| Dao.to_dao(element)}
 
       else
-        if object.respond_to?(:to_alpo)
-          object.send(:to_alpo, *args, &block)
+        if object.respond_to?(:to_dao)
+          object.send(:to_dao, *args, &block)
         else
           object
         end

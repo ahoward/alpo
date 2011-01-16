@@ -1,4 +1,10 @@
-module Alpo
+module Dao
+  class << Api
+    def routes
+      @routes ||= Route::List.new
+    end
+  end
+
   class Api
     class Route < ::String
       class << Route
@@ -26,7 +32,7 @@ module Alpo
         replace(path.to_s)
         @keys = Route.keys_for(route)
         @pattern = Route.pattern_for(route)
-        @params = Alpo.hash
+        @params = Dao.hash
         freeze
       end
 

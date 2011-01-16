@@ -1,9 +1,9 @@
-module Alpo
+module Dao
   module Util
     extend(Util)
   end
 
 
-  def Alpo.util(*args, &block)
+  def Dao.util(*args, &block)
   end
 end

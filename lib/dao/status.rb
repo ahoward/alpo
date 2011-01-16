@@ -1,4 +1,4 @@
-module Alpo
+module Dao
   class Status < ::String
     Code2Message = (
       {
@@ -143,55 +143,77 @@ module Alpo
       clone = Status.for(code)
     end
 
-    def Status.for(*args)
-      if args.size >= 2
-        code = args.shift
-        message = args.join(' ')
-        new(code, message)
-      else
-        arg = args.shift
-        case arg
-          when Status
-            arg
-          when Fixnum
-            code = arg
-            message = Code2Message[code]
-            new(code, message)
-          when Symbol, String
-            sym = Status.underscore(arg).to_sym
-            code = Symbol2Code[sym]
-            if code
+    def to_json(*args, &block)
+      Map[:code, code, :message, message].to_json(*args, &block)
+    end
+
+    class << Status
+      def for(*args)
+        if args.size >= 2
+          code = args.shift
+          message = args.join(' ')
+          new(code, message)
+        else
+          arg = args.shift
+          case arg
+            when Result
+              result = arg
+              if arg.errors.nil? or arg.errors.empty? or arg.valid?
+                new(200)
+              else
+                new(500)
+              end
+            when Status
+              arg
+            when Fixnum
+              code = arg
               message = Code2Message[code]
-            else
-              code = 500
-              message = "Unknown Status #{ arg }"
-            end
-            new(code, message)
-          else
-            if arg.respond_to?(:code) and arg.respond_to?(:message)
-              code, message = arg.code, arg.message
+              new(code, message)
+            when Symbol, String
+              sym = Status.underscore(arg).to_sym
+              code = Symbol2Code[sym]
+              if code
+                message = Code2Message[code]
+              else
+                code = 500
+                message = "Unknown Status #{ arg }"
+              end
               new(code, message)
             else
-              parse(arg)
-            end
+              if arg.respond_to?(:code) and arg.respond_to?(:message)
+                code, message = arg.code, arg.message
+                new(code, message)
+              else
+                parse(arg)
+              end
+          end
+        end
+      end
+
+      def parse(string)
+        first, last = string.to_s.strip.split(%r/\s+/, 2)
+        if first =~ %r/^\d+$/
+          code = Integer(first)
+          message = last
+        else
+          code = 500
+          message = "Unknown Status #{ string.inspect }"
+        end
+        new(code, message)
+      end
+
+      def cast(*args)
+        if args.size == 1
+          value = args.first
+          value.is_a?(self) ? value : self.for(value)
+        else
+          self.for(*args)
         end
       end
     end
-
-    def Status.parse(string)
-      first, last = string.to_s.strip.split(%r/\s+/, 2)
-      if first =~ %r/^\d+$/
-        code = Integer(first)
-        message = last
-      else
-        code = 500
-        message = "Unknown Status #{ string.inspect }"
-      end
-      new(code, message)
-    end
   end
 
-  def Alpo.status(*args, &block)
+  def Dao.status(*args, &block)
     if args.empty? and block.nil?
       Status
     else

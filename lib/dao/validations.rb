@@ -1,10 +1,10 @@
-module Alpo
-  class Validations < Map
+module Dao
+  class Validations < Dao::Map
     class Callback < ::Proc
       attr :options
 
       def initialize(options = {}, &block)
-        @options = Alpo.map_for(options || {})
+        @options = Dao.map_for(options || {})
         super(&block)
       end
 
@@ -13,10 +13,20 @@ module Alpo
       end
     end
 
-    attr 'data'
+    def Validations.for(*args, &block)
+      new(*args, &block)
+    end
 
-    def initialize(data = Alpo.data)
-      @data = data
+    attr_accessor :result
+
+    def initialize(*args, &block)
+      @result = args.shift if args.first.is_a?(Result)
+      super
+    end
+
+    def data
+      raise "no result.data!" unless result
+      result.data
     end
 
     def errors
@@ -81,7 +91,7 @@ module Alpo
     end
 
     def add(*args, &block)
-      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+      options = Dao.map_for(args.last.is_a?(Hash) ? args.pop : {})
       block = args.pop if args.last.respond_to?(:call)
       callback = Validations::Callback.new(options, &block)
       args.push(callback)

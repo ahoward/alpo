@@ -1,10 +1,10 @@
-module Alpo
-  module Params
+module Dao
+  class Params < Dao::Map
     def parse(*args, &block)
       hash = args.last.is_a?(Hash) ? args.pop : {}
       path = args.empty? ? 'data' : args.shift
       path = path.to_s
-      data = Alpo::Data.new(path)
+      data = Dao::Data.new(path)
       hash = Map.new.update(hash)
       base = hash[path]
       data.update(base) if base
@@ -28,12 +28,9 @@ module Alpo
 
       data
     end
-
-    extend Params
   end
 
-
-  def Alpo.parse(*args, &block)
+  def Dao.parse(*args, &block)
     Params.parse(*args, &block)
   end
 end

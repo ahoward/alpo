@@ -1,10 +1,32 @@
-module Alpo
+module Dao
   class Form
-    attr 'data'
     include Tagz.globally
 
-    def initialize(data)
-      @data = data
+    class << Form 
+      def for(*args, &block)
+        new(*args, &block)
+      end
+
+      def cast(*args)
+        if args.size == 1
+          value = args.first
+          value.is_a?(self) ? value : self.for(value)
+        else
+          self.for(*args)
+        end
+      end
+    end
+
+    attr_accessor :result
+
+    def initialize(*args, &block)
+      @result = args.shift if args.first.is_a?(Result)
+      super
+    end
+
+    def data
+      raise "no result.data!" unless result
+      result.data
     end
 
     def ==(other)
@@ -16,7 +38,7 @@ module Alpo
     end
 
     def form(*args, &block)
-      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+      options = Dao.map_for(args.last.is_a?(Hash) ? args.pop : {})
       keys = args.flatten
 
       action = options.delete(:action) || '#'
@@ -35,7 +57,7 @@ module Alpo
     end
 
     def label(*args, &block)
-      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+      options = Dao.map_for(args.last.is_a?(Hash) ? args.pop : {})
       keys = args.flatten
 
       name = options.delete(:name) || keys.last
@@ -53,7 +75,7 @@ module Alpo
     end
 
     def input(*args, &block)
-      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+      options = Dao.map_for(args.last.is_a?(Hash) ? args.pop : {})
       keys = args.flatten
 
       type = options.delete(:type) || :text
@@ -72,7 +94,7 @@ module Alpo
     end
 
     def submit(*args, &block)
-      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+      options = Dao.map_for(args.last.is_a?(Hash) ? args.pop : {})
       options[:type] = :submit
       options[:value] = block ? block.call : :Submit
       args.push(options)
@@ -80,7 +102,7 @@ module Alpo
     end
 
     def button(*args)
-      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+      options = Dao.map_for(args.last.is_a?(Hash) ? args.pop : {})
       keys = args.flatten
 
       type = options.delete(:type) || :button
@@ -99,14 +121,14 @@ module Alpo
     end
 
     def reset(*args)
-      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+      options = Dao.map_for(args.last.is_a?(Hash) ? args.pop : {})
       options[:type] = :reset
       args.push(options)
       button(*args)
     end
 
     def textarea(*args, &block)
-      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+      options = Dao.map_for(args.last.is_a?(Hash) ? args.pop : {})
       keys = args.flatten
 
       name = options.delete(:name) || name_for(keys)
@@ -124,7 +146,7 @@ module Alpo
     end
 
     def select(*args, &block)
-      options = Alpo.map_for(args.last.is_a?(Hash) ? args.pop : {})
+      options = Dao.map_for(args.last.is_a?(Hash) ? args.pop : {})
       keys = args.flatten
 
       name = options.delete(:name) || name_for(keys)
@@ -163,7 +185,7 @@ module Alpo
     end
 
     def class_for(keys, klass = nil)
-      klass = [klass, 'alpo', 'errors'].compact.join(' ') if data.errors.on?(keys)
+      klass = [klass, 'dao', 'errors'].compact.join(' ') if data.errors.on?(keys)
       klass
     end
 

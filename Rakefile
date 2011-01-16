@@ -26,7 +26,8 @@ def run_tests!(which = nil)
         
   div = ('=' * 119)
   line = ('-' * 119)
-  helper = "-r ./test/helper.rb" if test(?e, "./test/helper.rb")
+  #helper = "-r ./test/helper.rb" if test(?e, "./test/helper.rb")
+  helper = nil
 
   test_rbs.each_with_index do |test_rb, index|
     testno = index + 1

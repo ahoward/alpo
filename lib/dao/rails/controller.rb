@@ -1,0 +1,2 @@
+module Dao
+end

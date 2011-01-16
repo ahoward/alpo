@@ -1,10 +1,10 @@
-module Alpo
+module Dao
   class Db
     attr_accessor :path
 
     def initialize(*args)
-      options = Alpo.hash(args.last.is_a?(Hash) ? args.pop : {})
-      @path = (args.shift || options[:path] || 'alpo.yml').to_s
+      options = Dao.hash(args.last.is_a?(Hash) ? args.pop : {})
+      @path = (args.shift || options[:path] || 'dao.yml').to_s
       FileUtils.mkdir_p(File.dirname(@path)) rescue nil
     end
 
@@ -66,7 +66,7 @@ module Alpo
     end
 
     def save(collection, data = {})
-      data = Alpo.data(data)
+      data = Dao.data(data)
       ystore.transaction do |y|
         collection = (y[collection.to_s] ||= {})
         id = next_id_for(collection, data)
@@ -81,9 +81,9 @@ module Alpo
       ystore.transaction do |y|
         collection = (y[collection.to_s] ||= {})
         if id.nil? or id == :all
-          collection.values.map{|data| Alpo.data(data)}
+          collection.values.map{|data| Dao.data(data)}
         else
-          Alpo.data(collection[String(id)])
+          Dao.data(collection[String(id)])
         end
       end
     end
@@ -95,7 +95,7 @@ module Alpo
           collection.clear()
         else
           deleted = collection.delete(String(id))
-          Alpo.data(deleted) if deleted
+          Dao.data(deleted) if deleted
         end
       end
     end
@@ -135,7 +135,7 @@ module Alpo
       end
 
       def default_path()
-        File.join(default_root, 'alpo.yml')
+        File.join(default_root, 'dao.yml')
       end
 
       def method_missing(method, *args, &block)
@@ -148,7 +148,7 @@ module Alpo
     Db.instance = Db.new(Db.default_path)
   end
 
-  def Alpo.db(*args, &block)
+  def Dao.db(*args, &block)
     if args.empty? and block.nil?
       Db.instance
     else

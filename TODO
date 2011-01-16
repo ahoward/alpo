@@ -1,19 +1,61 @@
+idea:
+  signup = Api.read.signup(params)  ### should auto-parse
+
+    /api/signup(email)    ### /api/signup[email]
+    /api/signup(password) ### /api/signup[password]
+                          ### /api/signup[array][]=42 ? how would errors map
+
+  signup.form.email
+  signup.form.password
+
+  return if request.get?
+
+  signup.write! ### api.call('/signup', params, :write)
+
+
+
 todo:
-  - base/example api controller
-  - base/example application helper
-  - base/example api
+  - Endpoint registers class methods
+
+  - Path==Route ??
+
+  - result.write!|get!|post!
+
+  - #call auto parses data iff appropriate
+      @result = api.read.call('/posts/new(', params)  ### check keys for '/posts/new'
+
+  - description logic
+
+  - to_alpo -> to_dao
+  - AR as_dao contains the model type/class
 
   - nested AR conversions
       to_alpo(:a, :b => [:foo, :bar])
 
-  - json/pretty fix baked in?
+  - handling errors with exceptions?
+      result.render?
+      render_dao(data)
+
+  - check the db layer
+
+  - next 'data' => {}
+
+  - engine-ify the rails stuff?  or what
+    - generator api
+    - controller
+    - helper
+
+  - make sure one can call route based method (/foo/:bar) methods with params...
+
+  - json/pretty fix baked in? (yajl might simply this...)
 
   - re-visit how parameters are parsed, perhaps we just use rack?
 
-
+  - tests!
 
 
 done:
+  - add result.rb, params.rb
   - name -> path
   - tagz for html methods?
   - data aquires the name/path of the method?

@@ -1,4 +1,4 @@
-module Alpo
+module Dao
   class Slug < ::String
     def Slug.for(*args)
       string = args.flatten.compact.join('-')
